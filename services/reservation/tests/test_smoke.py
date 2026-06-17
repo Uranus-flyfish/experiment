@@ -1,4 +1,5 @@
 import time
+import uuid
 import requests
 
 BASE = "http://localhost:8081"
@@ -23,24 +24,25 @@ def test_list_tables():
 
 
 def test_create_reservation():
-    """Smoke: create reservation"""
+    """Smoke: create reservation (unique per call to avoid 409 conflict)"""
+    unique_id = uuid.uuid4().hex[:8]
     payload = {
         "storeId": "store-001",
-        "date": "2026-07-01",
-        "timeSlot": "12:00",
+        "date": f"2026-07-{int(unique_id[:2], 16) % 28 + 1:02d}",
+        "timeSlot": f"{int(unique_id[2:4], 16) % 14 + 10:02d}:{int(unique_id[4:6], 16) % 2 * 30:02d}",
         "guestCount": 2,
         "tableId": "table-001",
-        "note": "window seat please",
+        "note": f"smoke test {unique_id}",
     }
     r = requests.post(f"{BASE}/api/reservations", json=payload, timeout=5)
-    assert r.status_code == 201
+    assert r.status_code == 201, f"Create failed (status={r.status_code}): {r.text}"
     data = r.json()
     assert data["data"]["status"] == "PENDING"
     return data["data"]["id"]
 
 
 def test_accept_reservation():
-    """Smoke: accept → confirm → complete lifecycle"""
+    """Smoke: accept → confirm lifecycle"""
     res_id = test_create_reservation()
     # Accept
     r = requests.post(f"{BASE}/api/reservations/{res_id}/accept", timeout=5)
