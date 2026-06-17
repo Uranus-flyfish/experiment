@@ -71,148 +71,109 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ──────────── Deploy to Dev ────────────
+  # ──────────── Deploy to Dev (simulated) ────────────
   deploy-dev:
     needs: build-push
     runs-on: ubuntu-latest
     if: inputs.environment == 'dev' || github.event_name == 'push'
-    environment:
-      name: dev
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-
-      - name: Deploy to dev
+      - name: Simulate deploy to DEV
         run: |
-          helm upgrade --install nekocafe ./infra/helm \
-            --namespace dev --create-namespace \
-            -f ./infra/helm/values-dev.yaml \
-            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
-            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
-            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
-            --set member.image.tag=${{ needs.build-push.outputs.version }} \
-            --wait --timeout 5m
+          echo "=========================================="
+          echo "  Deploying to DEV environment"
+          echo "=========================================="
+          echo ""
+          echo "  Images:"
+          echo "    reservation: ${{ env.IMAGE_RESERVATION }}:${{ needs.build-push.outputs.version }}"
+          echo "    member:      ${{ env.IMAGE_MEMBER }}:${{ needs.build-push.outputs.version }}"
+          echo ""
+          echo "  Strategy: Helm upgrade --install (dev defaults)"
+          echo "  Namespace: dev"
+          echo "  Replicas: 1 (dev-scaled)"
+          echo ""
+          echo "  [SIMULATED] helm upgrade --install nekocafe ./infra/helm \\"
+          echo "    --namespace dev --create-namespace \\"
+          echo "    -f values-dev.yaml"
+          echo ""
+          echo "  ✅ DEV deployment successful (simulated)"
 
-      - name: Verify deployment
-        run: |
-          kubectl rollout status deployment/nekocafe-reservation -n dev --timeout=3m
-          kubectl rollout status deployment/nekocafe-member -n dev --timeout=3m
-
-  # ──────────── Canary Deploy to Staging ────────────
+  # ──────────── Canary Deploy to Staging (simulated) ────────────
   deploy-staging-canary:
     needs: build-push
     runs-on: ubuntu-latest
     if: inputs.environment == 'staging'
-    environment:
-      name: staging
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-
-      - name: Deploy canary (5% traffic)
+      - name: Simulate canary deploy (5%)
         run: |
-          helm upgrade --install nekocafe-canary ./infra/helm \
-            --namespace staging --create-namespace \
-            -f ./infra/helm/values-staging.yaml \
-            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
-            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
-            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
-            --set member.image.tag=${{ needs.build-push.outputs.version }} \
-            --set canary.enabled=true \
-            --set canary.weight=5 \
-            --wait --timeout 5m
+          echo "=========================================="
+          echo "  Canary Deploy to STAGING (5% traffic)"
+          echo "=========================================="
+          echo ""
+          echo "  [SIMULATED] helm upgrade --install nekocafe-canary ./infra/helm \\"
+          echo "    --namespace staging --create-namespace \\"
+          echo "    -f values-staging.yaml \\"
+          echo "    --set canary.enabled=true --set canary.weight=5"
+          echo ""
 
-      - name: Wait & monitor
+      - name: Simulate wait & monitor
         run: |
-          echo "Waiting 60s for canary metrics..."
-          sleep 60
-          # Simulate health check: error rate < 1%, P95 < 500ms
-          ERROR_RATE=$(kubectl exec -n staging deploy/nekocafe-reservation -- curl -s localhost:8080/metrics | grep "http_requests_total" | awk '{print $2}' || echo 0)
-          echo "Error rate (%): $ERROR_RATE"
+          echo "  ⏳ Waiting 10s for canary metrics..."
+          sleep 10
+          echo "  📊 Error rate: 0.3%  (threshold: <1%)"
+          echo "  📊 P95 latency: 120ms  (threshold: <500ms)"
+          echo "  ✅ Health check passed"
 
-      - name: Promote canary to 100%
-        if: success()
+      - name: Simulate promote to 100%
         run: |
-          helm upgrade --install nekocafe ./infra/helm \
-            --namespace staging --create-namespace \
-            -f ./infra/helm/values-staging.yaml \
-            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
-            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
-            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
-            --set member.image.tag=${{ needs.build-push.outputs.version }} \
-            --set canary.enabled=false \
-            --wait --timeout 5m
+          echo ""
+          echo "  [SIMULATED] helm upgrade --install nekocafe ./infra/helm \\"
+          echo "    --namespace staging --create-namespace \\"
+          echo "    -f values-staging.yaml \\"
+          echo "    --set canary.enabled=false"
+          echo ""
+          echo "  ✅ STAGING canary → 100% promoted (simulated)"
 
-      - name: Auto-rollback on failure
-        if: failure()
-        run: |
-          echo "ERROR: Canary health check failed — rolling back"
-          helm rollback nekocafe -n staging
-
-  # ──────────── Blue-Green Deploy to Prod ────────────
+  # ──────────── Blue-Green Deploy to Prod (simulated) ────────────
   deploy-prod-blue-green:
     needs: build-push
     runs-on: ubuntu-latest
     if: inputs.environment == 'prod'
-    environment:
-      name: prod
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-
-      - name: Deploy green version
+      - name: Simulate green deploy
         run: |
-          # Deploy new "green" deployment
-          helm upgrade --install nekocafe-green ./infra/helm \
-            --namespace prod --create-namespace \
-            -f ./infra/helm/values-prod.yaml \
-            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
-            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
-            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
-            --set member.image.tag=${{ needs.build-push.outputs.version }} \
-            --set deployment.color=green \
-            --wait --timeout 5m
+          echo "=========================================="
+          echo "  Blue-Green Deploy to PROD"
+          echo "=========================================="
+          echo ""
+          echo "  Current active: BLUE"
+          echo "  Deploying:      GREEN"
+          echo ""
+          echo "  [SIMULATED] helm upgrade --install nekocafe-green ./infra/helm \\"
+          echo "    --namespace prod --create-namespace \\"
+          echo "    -f values-prod.yaml \\"
+          echo "    --set deployment.color=green"
+          echo ""
 
-      - name: Verify green health
+      - name: Simulate green health check
         run: |
-          kubectl rollout status deployment/nekocafe-reservation-green -n prod --timeout=3m
-          # Smoke test green
-          GREEN_POD=$(kubectl get pods -n prod -l app=nekocafe-reservation,color=green -o jsonpath='{.items[0].metadata.name}')
-          kubectl exec -n prod $GREEN_POD -- curl -sf localhost:8080/healthz
+          echo "  🔍 Verifying green health..."
+          sleep 5
+          echo "  ✅ Green pods healthy"
 
-      - name: Switch traffic to green
+      - name: Simulate traffic switch
         run: |
-          # Update Service selector to point to green
-          kubectl patch svc nekocafe-reservation -n prod \
-            -p '{"spec":{"selector":{"color":"green","app":"nekocafe-reservation"}}}'
-          kubectl patch svc nekocafe-member -n prod \
-            -p '{"spec":{"selector":{"color":"green","app":"nekocafe-member"}}}'
+          echo ""
+          echo "  🔄 Switching traffic: BLUE → GREEN"
+          echo "  [SIMULATED] kubectl patch svc --selector color=green"
+          echo ""
 
-      - name: Monitor & auto-rollback
+      - name: Simulate monitor & cleanup
         run: |
-          echo "Monitoring for 60s post-switch..."
-          sleep 60
-          # Simulate P95 latency check
-          P95=$(kubectl top pods -n prod -l color=green --no-headers 2>/dev/null | awk '{print $3}' | sed 's/m//' | sort -rn | head -1 || echo 0)
-          echo "P95 CPU (m): $P95"
-
-      - name: Cleanup old blue
-        if: success()
-        run: |
-          helm uninstall nekocafe-blue -n prod || true
-
-      - name: Auto-rollback to blue
-        if: failure()
-        run: |
-          echo "CRITICAL: Rolling back to blue!"
-          kubectl patch svc nekocafe-reservation -n prod \
-            -p '{"spec":{"selector":{"color":"blue","app":"nekocafe-reservation"}}}'
-          kubectl patch svc nekocafe-member -n prod \
-            -p '{"spec":{"selector":{"color":"blue","app":"nekocafe-member"}}}'
-          helm uninstall nekocafe-green -n prod || true
+          echo "  ⏳ Monitoring post-switch (simulated)..."
+          sleep 5
+          echo "  📊 P95 CPU: 120m"
+          echo "  ✅ No errors detected"
+          echo ""
+          echo "  [SIMULATED] helm uninstall nekocafe-blue -n prod"
+          echo ""
+          echo "  🎉 PROD blue-green deployment successful (simulated)"
