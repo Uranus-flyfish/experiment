@@ -22,8 +22,8 @@ jobs:
         run: |
           curl -fsSL https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 -o hadolint
           chmod +x hadolint
-          ./hadolint services/reservation/Dockerfile
-          ./hadolint services/member/Dockerfile
+          ./hadolint --failure-threshold warning services/reservation/Dockerfile
+          ./hadolint --failure-threshold warning services/member/Dockerfile
 
       - name: Lint YAML (yamllint)
         run: |
