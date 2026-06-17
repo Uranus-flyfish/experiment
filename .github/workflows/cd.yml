@@ -18,8 +18,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_RESERVATION: ghcr.io/nekocafe/reservation
-  IMAGE_MEMBER: ghcr.io/nekocafe/member
+  IMAGE_RESERVATION: ghcr.io/${{ github.repository_owner }}/reservation
+  IMAGE_MEMBER: ghcr.io/${{ github.repository_owner }}/member
 
 jobs:
   # ──────────── Build & Push ────────────
@@ -89,7 +89,10 @@ jobs:
           helm upgrade --install nekocafe ./infra/helm \
             --namespace dev --create-namespace \
             -f ./infra/helm/values-dev.yaml \
-            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
+            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
+            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
+            --set member.image.tag=${{ needs.build-push.outputs.version }} \
             --wait --timeout 5m
 
       - name: Verify deployment
@@ -115,7 +118,10 @@ jobs:
           helm upgrade --install nekocafe-canary ./infra/helm \
             --namespace staging --create-namespace \
             -f ./infra/helm/values-staging.yaml \
-            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
+            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
+            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
+            --set member.image.tag=${{ needs.build-push.outputs.version }} \
             --set canary.enabled=true \
             --set canary.weight=5 \
             --wait --timeout 5m
@@ -134,7 +140,10 @@ jobs:
           helm upgrade --install nekocafe ./infra/helm \
             --namespace staging --create-namespace \
             -f ./infra/helm/values-staging.yaml \
-            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
+            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
+            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
+            --set member.image.tag=${{ needs.build-push.outputs.version }} \
             --set canary.enabled=false \
             --wait --timeout 5m
 
@@ -163,7 +172,10 @@ jobs:
           helm upgrade --install nekocafe-green ./infra/helm \
             --namespace prod --create-namespace \
             -f ./infra/helm/values-prod.yaml \
-            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set reservation.image.repository=${{ env.IMAGE_RESERVATION }} \
+            --set member.image.repository=${{ env.IMAGE_MEMBER }} \
+            --set reservation.image.tag=${{ needs.build-push.outputs.version }} \
+            --set member.image.tag=${{ needs.build-push.outputs.version }} \
             --set deployment.color=green \
             --wait --timeout 5m
 

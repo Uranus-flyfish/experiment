@@ -11,7 +11,7 @@ reservation:
   enabled: true
   replicaCount: 2
   image:
-    repository: ghcr.io/nekocafe/reservation
+    repository: ghcr.io/Uranus-flyfish/reservation
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   service:
@@ -52,7 +52,7 @@ member:
   enabled: true
   replicaCount: 2
   image:
-    repository: ghcr.io/nekocafe/member
+    repository: ghcr.io/Uranus-flyfish/member
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   service:
