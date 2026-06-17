@@ -18,8 +18,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_RESERVATION: ghcr.io/${{ lower(github.repository_owner) }}/reservation
-  IMAGE_MEMBER: ghcr.io/${{ lower(github.repository_owner) }}/member
+  IMAGE_RESERVATION: ghcr.io/uranus-flyfish/reservation
+  IMAGE_MEMBER: ghcr.io/uranus-flyfish/member
 
 jobs:
   # ──────────── Build & Push ────────────
