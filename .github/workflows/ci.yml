@@ -58,10 +58,15 @@ jobs:
         run: |
           cd services/reservation
           pip install -r requirements.txt pytest
-          docker compose up -d reservation
-          sleep 5
+          # Start Flask app in background (port 8081 matches test expectation)
+          PORT=8081 python src/main.py &
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8081/healthz && break
+            echo "Waiting for reservation service... ($i)"
+            sleep 2
+          done
           python -m pytest tests/ -v --junitxml=../../reports/reservation-junit.xml
-          docker compose stop reservation
+          kill %1 2>/dev/null || true
 
       - name: Setup Node.js (member)
         if: matrix.service == 'member'
@@ -76,10 +81,15 @@ jobs:
         run: |
           cd services/member
           npm ci
-          docker compose up -d member
-          sleep 5
+          # Start member service in background (port 8082 matches test expectation)
+          PORT=8082 node src/index.js &
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8082/healthz && break
+            echo "Waiting for member service... ($i)"
+            sleep 2
+          done
           node --test tests/*.test.js 2>&1 | tee ../../reports/member-test.log
-          docker compose stop member
+          kill %1 2>/dev/null || true
 
   # ──────────── Stage 3: SAST (CodeQL) ────────────
   sast:
