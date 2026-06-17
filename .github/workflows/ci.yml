@@ -65,6 +65,7 @@ jobs:
             echo "Waiting for reservation service... ($i)"
             sleep 2
           done
+          mkdir -p ../../reports
           python -m pytest tests/ -v --junitxml=../../reports/reservation-junit.xml
           kill %1 2>/dev/null || true
 
@@ -88,6 +89,7 @@ jobs:
             echo "Waiting for member service... ($i)"
             sleep 2
           done
+          mkdir -p ../../reports
           node --test tests/*.test.js 2>&1 | tee ../../reports/member-test.log
           kill %1 2>/dev/null || true
 
