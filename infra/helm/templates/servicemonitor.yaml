@@ -1,0 +1,33 @@
+{{- if .Values.observability.servicemonitor.enabled }}
+{{- range $service := list "reservation" "member" }}
+{{- $svc := index $.Values $service }}
+{{- if $svc.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $.Release.Name }}-{{ $service }}-monitor
+  labels:
+    app: {{ $.Release.Name }}-{{ $service }}
+    environment: {{ $.Values.global.environment }}
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-{{ $service }}
+  namespaceSelector:
+    matchNames:
+      - {{ $.Values.global.environment }}
+  endpoints:
+    - port: http
+      interval: {{ $.Values.observability.servicemonitor.interval }}
+      path: {{ $.Values.observability.servicemonitor.path }}
+      scrapeTimeout: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_environment]
+          targetLabel: environment
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: service
+---
+{{- end }}
+{{- end }}
+{{- end }}

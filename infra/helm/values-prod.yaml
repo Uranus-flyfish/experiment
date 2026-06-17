@@ -1,0 +1,55 @@
+# Production environment overrides
+global:
+  environment: prod
+
+reservation:
+  replicaCount: 4
+  image:
+    pullPolicy: Always
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: 1000m, memory: 1Gi }
+  autoscaling:
+    minReplicas: 4
+    maxReplicas: 20
+  podDisruptionBudget:
+    minAvailable: 2
+  opentelemetry:
+    samplingRate: "0.1"
+
+member:
+  replicaCount: 4
+  image:
+    pullPolicy: Always
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: 1000m, memory: 1Gi }
+  autoscaling:
+    minReplicas: 4
+    maxReplicas: 20
+  podDisruptionBudget:
+    minAvailable: 2
+  opentelemetry:
+    samplingRate: "0.1"
+
+ingress:
+  hosts:
+    - host: api.nekocafe.bjfu.edu.cn
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+canary:
+  enabled: false
+
+observability:
+  servicemonitor:
+    interval: 15s
+
+alertRules:
+  errorRate:
+    severity: critical
+  p95Latency:
+    severity: critical
+  cpuUsage:
+    severity: warning

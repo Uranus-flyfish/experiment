@@ -1,0 +1,188 @@
+{{- $svc := .Values.reservation }}
+{{- if $svc.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-reservation
+  labels:
+    app: {{ .Release.Name }}-reservation
+    environment: {{ .Values.global.environment }}
+    {{- if .Values.canary.enabled }}
+    track: canary
+    {{- end }}
+  {{- if and (not .Values.canary.enabled) (eq .Values.global.environment "prod") }}
+    color: {{ .Values.reservation.deployment.color | default "blue" }}
+  {{- end }}
+spec:
+  {{- if not .Values.canary.enabled }}
+  replicas: {{ $svc.replicaCount }}
+  {{- else }}
+  replicas: 1
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-reservation
+      {{- if .Values.canary.enabled }}
+      track: canary
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-reservation
+        environment: {{ .Values.global.environment }}
+        {{- if .Values.canary.enabled }}
+        track: canary
+        {{- end }}
+        {{- if and (not .Values.canary.enabled) (eq .Values.global.environment "prod") }}
+        color: {{ .Values.reservation.deployment.color | default "blue" }}
+        {{- end }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $svc.service.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: reservation
+          image: "{{ $svc.image.repository }}:{{ $svc.image.tag }}"
+          imagePullPolicy: {{ $svc.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.service.port }}
+              protocol: TCP
+          {{- if $svc.probe.liveness }}
+          livenessProbe:
+            httpGet:
+              path: {{ $svc.probe.liveness.path }}
+              port: {{ $svc.service.port }}
+            initialDelaySeconds: {{ $svc.probe.liveness.initialDelaySeconds }}
+            periodSeconds: {{ $svc.probe.liveness.periodSeconds }}
+          {{- end }}
+          {{- if $svc.probe.readiness }}
+          readinessProbe:
+            httpGet:
+              path: {{ $svc.probe.readiness.path }}
+              port: {{ $svc.service.port }}
+            initialDelaySeconds: {{ $svc.probe.readiness.initialDelaySeconds }}
+            periodSeconds: {{ $svc.probe.readiness.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+          env:
+            - name: DEPLOY_ENV
+              value: {{ .Values.global.environment | quote }}
+            - name: PORT
+              value: {{ $svc.service.port | quote }}
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-config
+                  key: logLevel
+            {{- if $svc.opentelemetry.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ $svc.opentelemetry.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: "reservation"
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-secret
+                optional: true
+---
+{{- end }}
+
+{{- $svc2 := .Values.member }}
+{{- if $svc2.enabled }}
+# ──────────── Member Deployment ────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-member
+  labels:
+    app: {{ .Release.Name }}-member
+    environment: {{ .Values.global.environment }}
+    {{- if .Values.canary.enabled }}
+    track: canary
+    {{- end }}
+  {{- if and (not .Values.canary.enabled) (eq .Values.global.environment "prod") }}
+    color: {{ .Values.member.deployment.color | default "blue" }}
+  {{- end }}
+spec:
+  {{- if not .Values.canary.enabled }}
+  replicas: {{ $svc2.replicaCount }}
+  {{- else }}
+  replicas: 1
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-member
+      {{- if .Values.canary.enabled }}
+      track: canary
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-member
+        environment: {{ .Values.global.environment }}
+        {{- if .Values.canary.enabled }}
+        track: canary
+        {{- end }}
+        {{- if and (not .Values.canary.enabled) (eq .Values.global.environment "prod") }}
+        color: {{ .Values.member.deployment.color | default "blue" }}
+        {{- end }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $svc2.service.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: member
+          image: "{{ $svc2.image.repository }}:{{ $svc2.image.tag }}"
+          imagePullPolicy: {{ $svc2.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc2.service.port }}
+              protocol: TCP
+          {{- if $svc2.probe.liveness }}
+          livenessProbe:
+            httpGet:
+              path: {{ $svc2.probe.liveness.path }}
+              port: {{ $svc2.service.port }}
+            initialDelaySeconds: {{ $svc2.probe.liveness.initialDelaySeconds }}
+            periodSeconds: {{ $svc2.probe.liveness.periodSeconds }}
+          {{- end }}
+          {{- if $svc2.probe.readiness }}
+          readinessProbe:
+            httpGet:
+              path: {{ $svc2.probe.readiness.path }}
+              port: {{ $svc2.service.port }}
+            initialDelaySeconds: {{ $svc2.probe.readiness.initialDelaySeconds }}
+            periodSeconds: {{ $svc2.probe.readiness.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml $svc2.resources | nindent 12 }}
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: {{ $svc2.service.port | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-secret
+                optional: true
+{{- end }}

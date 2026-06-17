@@ -1,0 +1,30 @@
+# Development environment overrides
+global:
+  environment: dev
+
+reservation:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 256Mi }
+  opentelemetry:
+    samplingRate: "1.0"  # full sampling in dev
+
+member:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 256Mi }
+  opentelemetry:
+    samplingRate: "1.0"
+
+ingress:
+  hosts:
+    - host: api.nekocafe.local
+
+canary:
+  enabled: false
+
+observability:
+  servicemonitor:
+    interval: 15s

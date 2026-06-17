@@ -1,0 +1,22 @@
+{{- range $service := list "reservation" "member" }}
+{{- $svc := index $.Values $service }}
+{{- if $svc.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $service }}
+  labels:
+    app: {{ $.Release.Name }}-{{ $service }}
+    environment: {{ $.Values.global.environment }}
+spec:
+  type: {{ $svc.service.type }}
+  selector:
+    app: {{ $.Release.Name }}-{{ $service }}
+  ports:
+    - port: {{ $svc.service.port }}
+      targetPort: {{ $svc.service.port }}
+      protocol: TCP
+      name: http
+---
+{{- end }}
+{{- end }}

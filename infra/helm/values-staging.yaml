@@ -1,0 +1,31 @@
+# Staging environment overrides
+global:
+  environment: staging
+
+reservation:
+  replicaCount: 2
+  opentelemetry:
+    samplingRate: "0.5"
+
+member:
+  replicaCount: 2
+  opentelemetry:
+    samplingRate: "0.5"
+
+canary:
+  enabled: true
+  weight: 5
+
+ingress:
+  hosts:
+    - host: api.nekocafe-staging.dev
+
+observability:
+  servicemonitor:
+    interval: 30s
+
+alertRules:
+  errorRate:
+    severity: warning
+  p95Latency:
+    severity: warning

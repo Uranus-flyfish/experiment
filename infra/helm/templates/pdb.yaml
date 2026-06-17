@@ -1,0 +1,21 @@
+{{- range $service := list "reservation" "member" }}
+{{- $svc := index $.Values $service }}
+{{- if and $svc.enabled $svc.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $service }}-pdb
+  labels:
+    app: {{ $.Release.Name }}-{{ $service }}
+    environment: {{ $.Values.global.environment }}
+spec:
+  minAvailable: {{ $svc.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-{{ $service }}
+      {{- if $.Values.canary.enabled }}
+      track: canary
+      {{- end }}
+---
+{{- end }}
+{{- end }}

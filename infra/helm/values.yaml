@@ -1,0 +1,142 @@
+# Default values for NekoCafe Helm Chart
+
+# ──────────── Global ────────────
+global:
+  environment: dev
+  registry: ghcr.io
+  imagePullSecrets: []
+
+# ──────────── Reservation Service ────────────
+reservation:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ghcr.io/nekocafe/reservation
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  probe:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 15
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+  opentelemetry:
+    enabled: true
+    endpoint: http://tempo:4317
+    samplingRate: "0.1"
+
+# ──────────── Member Service ────────────
+member:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ghcr.io/nekocafe/member
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  probe:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 15
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+  opentelemetry:
+    enabled: true
+    endpoint: http://tempo:4317
+    samplingRate: "0.1"
+
+# ──────────── Ingress ────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: api.nekocafe.dev
+      paths:
+        - path: /reservation
+          pathType: Prefix
+          service: reservation
+        - path: /member
+          pathType: Prefix
+          service: member
+
+# ──────────── Canary Deployment ────────────
+canary:
+  enabled: false
+  weight: 5  # canary traffic percentage
+
+# ──────────── Observability ────────────
+observability:
+  prometheus:
+    enabled: true
+    port: 9090
+  servicemonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# ──────────── Alert Rules ────────────
+alertRules:
+  errorRate:
+    enabled: true
+    threshold: 1  # P1 if > 1%
+    severity: warning
+  p95Latency:
+    enabled: true
+    threshold: 500  # P1 if P95 > 500ms
+    severity: warning
+  cpuUsage:
+    enabled: true
+    threshold: 80  # P3 if CPU > 80%
+    severity: info
+
+# ──────────── ConfigMap ────────────
+configMap:
+  appName: NekoCafe
+  logLevel: info
+  corsAllowedOrigins: "*"
