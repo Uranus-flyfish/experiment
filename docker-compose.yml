@@ -1,0 +1,82 @@
+services:
+  # ──────────── Reservation Service (Python/Flask) ────────────
+  reservation:
+    build:
+      context: .
+      dockerfile: services/reservation/Dockerfile
+    image: nekocafe-reservation:latest  # 添加这一行
+    container_name: nekocafe-reservation
+    ports:
+      - "8081:8080"
+    environment:
+      - DEPLOY_ENV=dev
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=reservation
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nekocafe-net
+
+  # ──────────── Member Service (Node.js/Express) ────────────
+  member:
+    build:
+      context: .
+      dockerfile: services/member/Dockerfile
+    image: nekocafe-member:latest  # 添加这一行（关键修复）
+    container_name: nekocafe-member
+    ports:
+      - "8082:8080"
+    environment:
+      - DEPLOY_ENV=dev
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nekocafe-net
+
+  # ──────────── PostgreSQL ────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: nekocafe-postgres
+    environment:
+      POSTGRES_DB: nekocafe
+      POSTGRES_USER: nekocafe
+      POSTGRES_PASSWORD: nekocafe_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nekocafe -d nekocafe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nekocafe-net
+
+  # ──────────── Redis ────────────
+  redis:
+    image: redis:7-alpine
+    container_name: nekocafe-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nekocafe-net
+
+volumes:
+  postgres-data:
+
+networks:
+  nekocafe-net:
+    driver: bridge

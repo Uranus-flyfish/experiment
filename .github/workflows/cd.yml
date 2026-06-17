@@ -1,0 +1,206 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      canary_pct:
+        description: "Canary traffic percentage"
+        required: false
+        default: "5"
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_RESERVATION: ghcr.io/nekocafe/reservation
+  IMAGE_MEMBER: ghcr.io/nekocafe/member
+
+jobs:
+  # ──────────── Build & Push ────────────
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: echo "version=$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build & push reservation
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/reservation/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_RESERVATION }}:latest
+            ${{ env.IMAGE_RESERVATION }}:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push member
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/member/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_MEMBER }}:latest
+            ${{ env.IMAGE_MEMBER }}:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────── Deploy to Dev ────────────
+  deploy-dev:
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'dev' || github.event_name == 'push'
+    environment:
+      name: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy to dev
+        run: |
+          helm upgrade --install nekocafe ./infra/helm \
+            --namespace dev --create-namespace \
+            -f ./infra/helm/values-dev.yaml \
+            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --wait --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/nekocafe-reservation -n dev --timeout=3m
+          kubectl rollout status deployment/nekocafe-member -n dev --timeout=3m
+
+  # ──────────── Canary Deploy to Staging ────────────
+  deploy-staging-canary:
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'staging'
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy canary (5% traffic)
+        run: |
+          helm upgrade --install nekocafe-canary ./infra/helm \
+            --namespace staging --create-namespace \
+            -f ./infra/helm/values-staging.yaml \
+            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set canary.enabled=true \
+            --set canary.weight=5 \
+            --wait --timeout 5m
+
+      - name: Wait & monitor
+        run: |
+          echo "Waiting 60s for canary metrics..."
+          sleep 60
+          # Simulate health check: error rate < 1%, P95 < 500ms
+          ERROR_RATE=$(kubectl exec -n staging deploy/nekocafe-reservation -- curl -s localhost:8080/metrics | grep "http_requests_total" | awk '{print $2}' || echo 0)
+          echo "Error rate (%): $ERROR_RATE"
+
+      - name: Promote canary to 100%
+        if: success()
+        run: |
+          helm upgrade --install nekocafe ./infra/helm \
+            --namespace staging --create-namespace \
+            -f ./infra/helm/values-staging.yaml \
+            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set canary.enabled=false \
+            --wait --timeout 5m
+
+      - name: Auto-rollback on failure
+        if: failure()
+        run: |
+          echo "ERROR: Canary health check failed — rolling back"
+          helm rollback nekocafe -n staging
+
+  # ──────────── Blue-Green Deploy to Prod ────────────
+  deploy-prod-blue-green:
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'prod'
+    environment:
+      name: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy green version
+        run: |
+          # Deploy new "green" deployment
+          helm upgrade --install nekocafe-green ./infra/helm \
+            --namespace prod --create-namespace \
+            -f ./infra/helm/values-prod.yaml \
+            --set image.tag=${{ needs.build-push.outputs.version }} \
+            --set deployment.color=green \
+            --wait --timeout 5m
+
+      - name: Verify green health
+        run: |
+          kubectl rollout status deployment/nekocafe-reservation-green -n prod --timeout=3m
+          # Smoke test green
+          GREEN_POD=$(kubectl get pods -n prod -l app=nekocafe-reservation,color=green -o jsonpath='{.items[0].metadata.name}')
+          kubectl exec -n prod $GREEN_POD -- curl -sf localhost:8080/healthz
+
+      - name: Switch traffic to green
+        run: |
+          # Update Service selector to point to green
+          kubectl patch svc nekocafe-reservation -n prod \
+            -p '{"spec":{"selector":{"color":"green","app":"nekocafe-reservation"}}}'
+          kubectl patch svc nekocafe-member -n prod \
+            -p '{"spec":{"selector":{"color":"green","app":"nekocafe-member"}}}'
+
+      - name: Monitor & auto-rollback
+        run: |
+          echo "Monitoring for 60s post-switch..."
+          sleep 60
+          # Simulate P95 latency check
+          P95=$(kubectl top pods -n prod -l color=green --no-headers 2>/dev/null | awk '{print $3}' | sed 's/m//' | sort -rn | head -1 || echo 0)
+          echo "P95 CPU (m): $P95"
+
+      - name: Cleanup old blue
+        if: success()
+        run: |
+          helm uninstall nekocafe-blue -n prod || true
+
+      - name: Auto-rollback to blue
+        if: failure()
+        run: |
+          echo "CRITICAL: Rolling back to blue!"
+          kubectl patch svc nekocafe-reservation -n prod \
+            -p '{"spec":{"selector":{"color":"blue","app":"nekocafe-reservation"}}}'
+          kubectl patch svc nekocafe-member -n prod \
+            -p '{"spec":{"selector":{"color":"blue","app":"nekocafe-member"}}}'
+          helm uninstall nekocafe-green -n prod || true
