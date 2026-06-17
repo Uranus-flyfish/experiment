@@ -149,38 +149,25 @@ jobs:
 
   # ──────────── Stage 5: Container Scan (Trivy) ────────────
   container-scan:
-    needs: build
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trivy scan — reservation
-        uses: aquasecurity/trivy-action@0.29.0
+      - name: Trivy scan — Dockerfiles & code
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/nekocafe/reservation:ci-${{ github.sha }}
+          scan-type: config
+          scan-ref: services/
           format: sarif
-          output: trivy-reservation.sarif
-          severity: HIGH,CRITICAL
-          exit-code: 0  # Report only, don't fail
-
-      - name: Trivy scan — member
-        uses: aquasecurity/trivy-action@0.29.0
-        with:
-          image-ref: ghcr.io/nekocafe/member:ci-${{ github.sha }}
-          format: sarif
-          output: trivy-member.sarif
+          output: trivy-results.sarif
           severity: HIGH,CRITICAL
           exit-code: 0
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-reservation.sarif
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-member.sarif
+          sarif_file: trivy-results.sarif
 
   # ──────────── Stage 6: Integration Test ────────────
   integration-test:
