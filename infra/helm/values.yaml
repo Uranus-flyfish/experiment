@@ -11,7 +11,7 @@ reservation:
   enabled: true
   replicaCount: 2
   image:
-    repository: ghcr.io/Uranus-flyfish/reservation
+    repository: ghcr.io/uranus-flyfish/reservation
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   service:
@@ -52,7 +52,7 @@ member:
   enabled: true
   replicaCount: 2
   image:
-    repository: ghcr.io/Uranus-flyfish/member
+    repository: ghcr.io/uranus-flyfish/member
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   service:

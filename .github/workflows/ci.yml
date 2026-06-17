@@ -133,7 +133,7 @@ jobs:
           context: .
           file: services/reservation/Dockerfile
           load: true
-          tags: ghcr.io/${{ github.repository_owner }}/reservation:ci-${{ github.sha }}
+          tags: ghcr.io/${{ lower(github.repository_owner) }}/reservation:ci-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
@@ -143,7 +143,7 @@ jobs:
           context: .
           file: services/member/Dockerfile
           load: true
-          tags: ghcr.io/${{ github.repository_owner }}/member:ci-${{ github.sha }}
+          tags: ghcr.io/${{ lower(github.repository_owner) }}/member:ci-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
